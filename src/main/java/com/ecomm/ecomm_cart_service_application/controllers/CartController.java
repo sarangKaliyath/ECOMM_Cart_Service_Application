@@ -1,21 +1,19 @@
 package com.ecomm.ecomm_cart_service_application.controllers;
 
-import com.ecomm.ecomm_cart_service_application.Repository.CartRepository;
 import com.ecomm.ecomm_cart_service_application.constants.CartConstants;
 import com.ecomm.ecomm_cart_service_application.dtos.AddToCartRequestDto;
 import com.ecomm.ecomm_cart_service_application.dtos.CartDto;
-import com.ecomm.ecomm_cart_service_application.dtos.CartItemDto;
 import com.ecomm.ecomm_cart_service_application.dtos.CartType;
-import com.ecomm.ecomm_cart_service_application.exceptions.InvalidQuantityException;
 import com.ecomm.ecomm_cart_service_application.services.ICartService;
-import com.ecomm.ecomm_cart_service_application.utils.CartKeyUtil;
-import com.ecomm.ecomm_cart_service_application.utils.CartUtils;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/cart")
@@ -26,9 +24,20 @@ public class CartController {
 
 
     @PostMapping("/add")
-    public ResponseEntity<Boolean> addItemToCart(@RequestBody AddToCartRequestDto reqDto) {
-        cartService.addToCart(reqDto.getCartId(), reqDto.getProductId(), reqDto.getProductName(), reqDto.getImageUrl(), reqDto.getPriceSnapshot(), reqDto.getCartType(), reqDto.getQuantity());
-        return ResponseEntity.status(HttpStatus.CREATED).body(true);
+    public ResponseEntity<CartDto> addItemToCart(@RequestBody AddToCartRequestDto reqDto, @CookieValue(value = "GUEST_CART_ID", required = false)
+    String guestCartId, HttpServletResponse response) {
+        if (guestCartId == null) guestCartId = UUID.randomUUID().toString();
+
+        ResponseCookie cookie = ResponseCookie.from("GUEST_CART_ID", guestCartId)
+                .httpOnly(true)
+                .path("/")
+                .maxAge(CartConstants.GUEST_CART_TTL)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        CartDto cartDto = cartService.addToCart(guestCartId, reqDto.getProductId(), reqDto.getProductName(), reqDto.getImageUrl(), reqDto.getPriceSnapshot(), reqDto.getCartType(), reqDto.getQuantity());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(cartDto);
     }
 
     public void removeItemFromCart() {

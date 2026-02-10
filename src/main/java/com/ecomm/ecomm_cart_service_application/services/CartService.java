@@ -20,7 +20,7 @@ public class CartService implements ICartService {
     private CartRepository cartRepository;
 
 
-    public Boolean addToCart(String cartId, Long productId, String productName, String imageUrl, Double priceSnapshot, CartType cartType, Integer quantity) {
+    public CartDto addToCart(String cartId, Long productId, String productName, String imageUrl, Double priceSnapshot, CartType cartType, Integer quantity) {
         if (quantity == null || quantity <= 0) {
             throw new InvalidQuantityException("Invalid quantity");
         }
@@ -59,7 +59,7 @@ public class CartService implements ICartService {
 
         cartRepository.save(redisKey, cart, cartType == CartType.GUEST ? CartConstants.GUEST_CART_TTL : CartConstants.USER_CART_TTL);
 
-        return true;
+        return cart;
     }
 
     public Boolean removeFromCart(String cartId, Long productId) {

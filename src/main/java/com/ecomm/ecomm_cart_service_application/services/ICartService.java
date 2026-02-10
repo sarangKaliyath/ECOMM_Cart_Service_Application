@@ -5,7 +5,7 @@ import com.ecomm.ecomm_cart_service_application.dtos.CartType;
 
 public interface ICartService {
 
-    Boolean addToCart(String cartId, Long productId, String productName, String productImageUrl, Double priceSnapshot, CartType cartType, Integer quantity);
+    CartDto addToCart(String cartId, Long productId, String productName, String productImageUrl, Double priceSnapshot, CartType cartType, Integer quantity);
 
     Boolean removeFromCart(String cartId, Long productId);
 
