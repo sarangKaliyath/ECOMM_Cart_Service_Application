@@ -77,4 +77,8 @@ public class CartService implements ICartService {
 
         return cartRepository.get(redisKey);
     }
+
+    public CartDto mergeCart(String guestCartId, String userCartId){
+        return null;
+    }
 }

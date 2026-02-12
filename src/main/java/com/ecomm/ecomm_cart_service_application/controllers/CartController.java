@@ -48,10 +48,24 @@ public class CartController {
 
     }
 
-    @GetMapping("/get/{cartId}/{cartType}")
-    public ResponseEntity<CartDto> getCartItems(@PathVariable String cartId, @PathVariable CartType cartType) {
+    @GetMapping("/get/{cartType}")
+    public ResponseEntity<CartDto> getCartItems(@PathVariable CartType cartType, @CookieValue(value = "GUEST_CART_ID", required = false) String cartId) {
+
+        if (cartId == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
         CartDto cart = cartService.getCart(cartId, cartType);
         return ResponseEntity.status(HttpStatus.OK).body(cart);
     }
 
+    @PostMapping("/merge")
+    public ResponseEntity<CartDto> mergeCarts(@CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId, String userId) {
+
+        if (guestCartId == null) {
+            return ResponseEntity.status(HttpStatus.OK).body(cartService.getCart(userId, CartType.USER));
+        }
+
+        return ResponseEntity.status(HttpStatus.OK).body(cartService.mergeCart(guestCartId, userId));
+    }
 }

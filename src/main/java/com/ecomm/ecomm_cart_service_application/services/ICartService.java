@@ -12,4 +12,6 @@ public interface ICartService {
     Boolean clearCart(String cartId);
 
     CartDto getCart(String cartId, CartType cartType);
+
+    CartDto mergeCart(String guestCartId, String userCartId);
 }
