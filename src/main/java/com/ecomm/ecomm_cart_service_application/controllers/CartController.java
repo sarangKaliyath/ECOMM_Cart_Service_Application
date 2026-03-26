@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -60,7 +61,11 @@ public class CartController {
     }
 
     @PostMapping("/merge")
-    public ResponseEntity<CartDto> mergeCarts(@CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId, String userId) {
+    public ResponseEntity<CartDto> mergeCarts(@CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId, JwtAuthenticationToken token) {
+
+        String userId = token.getName();
+
+        System.out.println(userId);
 
         if (guestCartId == null) {
             return ResponseEntity.status(HttpStatus.OK).body(cartService.getCart(userId, CartType.USER));
