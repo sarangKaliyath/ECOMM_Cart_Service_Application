@@ -3,7 +3,9 @@ package com.ecomm.ecomm_cart_service_application.controllers;
 import com.ecomm.ecomm_cart_service_application.constants.CartConstants;
 import com.ecomm.ecomm_cart_service_application.dtos.AddToCartRequestDto;
 import com.ecomm.ecomm_cart_service_application.dtos.CartDto;
+import com.ecomm.ecomm_cart_service_application.dtos.CartResponseDto;
 import com.ecomm.ecomm_cart_service_application.dtos.CartType;
+import com.ecomm.ecomm_cart_service_application.mapper.CartMapper;
 import com.ecomm.ecomm_cart_service_application.services.ICartService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,19 +52,23 @@ public class CartController {
     }
 
     @GetMapping("/get/{cartType}")
-    public ResponseEntity<CartDto> getCartItems(@PathVariable CartType cartType, @CookieValue(value = "GUEST_CART_ID", required = false) String cartId) {
+    public ResponseEntity<CartResponseDto> getCartItems(
+            @PathVariable CartType cartType,
+            @CookieValue(value = "GUEST_CART_ID", required = false) String cartId) {
 
         if (cartId == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
 
         CartDto cart = cartService.getCart(cartId, cartType);
-        return ResponseEntity.status(HttpStatus.OK).body(cart);
+
+        CartResponseDto cartResponse = CartMapper.toCartResponseDto(cart);
+        return ResponseEntity.status(HttpStatus.OK).body(cartResponse);
     }
 
     @PostMapping("/merge")
     public ResponseEntity<CartDto> mergeCarts(@CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId, JwtAuthenticationToken token) {
-
+        System.out.println(token);
         String userId = token.getName();
 
         System.out.println(userId);

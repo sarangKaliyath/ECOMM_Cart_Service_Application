@@ -78,7 +78,74 @@ public class CartService implements ICartService {
         return cartRepository.get(redisKey);
     }
 
-    public CartDto mergeCart(String guestCartId, String userCartId){
-        return null;
+    public CartDto mergeCart(String guestCartId, String userCartId) {
+        if (guestCartId == null || guestCartId.isBlank()) {
+            throw new IllegalArgumentException("Guest cart ID cannot be blank");
+        }
+        if (userCartId == null || userCartId.isBlank()) {
+            throw new IllegalArgumentException("User cart ID cannot be blank");
+        }
+
+        // Get the guest cart
+        String guestRedisKey = CartKeyUtil.cartKey(CartType.GUEST, guestCartId);
+        CartDto guestCart = cartRepository.get(guestRedisKey);
+
+        // If guest cart doesn't exist or is empty, get or create user cart
+        if (guestCart == null || guestCart.getCartItems().isEmpty()) {
+            CartDto userCart = getCart(userCartId, CartType.USER);
+            if (userCart == null) {
+                userCart = CartUtils.createNewCart(userCartId, CartType.USER);
+                String userRedisKey = CartKeyUtil.cartKey(CartType.USER, userCartId);
+                cartRepository.save(userRedisKey, userCart, CartConstants.USER_CART_TTL);
+            }
+            return userCart;
+        }
+
+        // Get or create user cart
+        String userRedisKey = CartKeyUtil.cartKey(CartType.USER, userCartId);
+        CartDto userCart = cartRepository.get(userRedisKey);
+        
+        if (userCart == null) {
+            userCart = CartUtils.createNewCart(userCartId, CartType.USER);
+        }
+
+        // Merge guest cart items into user cart
+        for (CartItemDto guestItem : guestCart.getCartItems()) {
+            boolean itemFound = false;
+            
+            // Check if item already exists in user cart
+            for (CartItemDto userItem : userCart.getCartItems()) {
+                if (userItem.getProductId().equals(guestItem.getProductId())) {
+                    // Combine quantities
+                    userItem.setQuantity(userItem.getQuantity() + guestItem.getQuantity());
+                    itemFound = true;
+                    break;
+                }
+            }
+            
+            // If item doesn't exist in user cart, add it
+            if (!itemFound) {
+                CartItemDto newItem = new CartItemDto();
+                newItem.setProductId(guestItem.getProductId());
+                newItem.setQuantity(guestItem.getQuantity());
+                newItem.setProductName(guestItem.getProductName());
+                newItem.setPriceSnapshot(guestItem.getPriceSnapshot());
+                newItem.setImageUrl(guestItem.getImageUrl());
+                
+                userCart.getCartItems().add(newItem);
+            }
+        }
+
+        // Recalculate totals and update timestamp
+        CartUtils.recalculateCart(userCart);
+        userCart.setLastUpdatedAt(new Date());
+
+        // Save the merged user cart
+        cartRepository.save(userRedisKey, userCart, CartConstants.USER_CART_TTL);
+
+        // Clean up guest cart
+        cartRepository.delete(guestRedisKey);
+
+        return userCart;
     }
 }
