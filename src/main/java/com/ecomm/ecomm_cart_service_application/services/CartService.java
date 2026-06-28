@@ -5,6 +5,7 @@ import com.ecomm.ecomm_cart_service_application.constants.CartConstants;
 import com.ecomm.ecomm_cart_service_application.dtos.CartDto;
 import com.ecomm.ecomm_cart_service_application.dtos.CartItemDto;
 import com.ecomm.ecomm_cart_service_application.dtos.CartType;
+import com.ecomm.ecomm_cart_service_application.exceptions.CartIdRequiredException;
 import com.ecomm.ecomm_cart_service_application.exceptions.InvalidQuantityException;
 import com.ecomm.ecomm_cart_service_application.utils.CartKeyUtil;
 import com.ecomm.ecomm_cart_service_application.utils.CartUtils;
@@ -62,6 +63,30 @@ public class CartService implements ICartService {
         return cart;
     }
 
+    public CartDto updateCartItemQuantity(String cartId, Long productId, Integer quantity) {
+        if(productId == null) throw new IllegalArgumentException("Product ID cannot be null");
+        if(quantity == null || quantity <= 0) throw new InvalidQuantityException("Invalid quantity");
+
+        String redisKey = CartKeyUtil.cartKey(CartType.GUEST, cartId);
+
+        CartDto cart = cartRepository.get(redisKey);
+
+        if(cart == null) throw new CartIdRequiredException("Cart not found");
+
+        for(CartItemDto item : cart.getCartItems()) {
+            if(item.getProductId().equals(productId)) {
+                item.setQuantity(quantity);
+                CartUtils.recalculateCart(cart);
+                cart.setLastUpdatedAt(new Date());
+                cartRepository.save(redisKey, cart, CartConstants.GUEST_CART_TTL);
+            }
+        }
+
+        cartRepository.save(redisKey, cart, CartConstants.GUEST_CART_TTL);
+
+        return cart;
+    }
+
     public Boolean removeFromCart(String cartId, Long productId) {
         return false;
     }
@@ -104,7 +129,7 @@ public class CartService implements ICartService {
         // Get or create user cart
         String userRedisKey = CartKeyUtil.cartKey(CartType.USER, userCartId);
         CartDto userCart = cartRepository.get(userRedisKey);
-        
+
         if (userCart == null) {
             userCart = CartUtils.createNewCart(userCartId, CartType.USER);
         }
@@ -112,7 +137,7 @@ public class CartService implements ICartService {
         // Merge guest cart items into user cart
         for (CartItemDto guestItem : guestCart.getCartItems()) {
             boolean itemFound = false;
-            
+
             // Check if item already exists in user cart
             for (CartItemDto userItem : userCart.getCartItems()) {
                 if (userItem.getProductId().equals(guestItem.getProductId())) {
@@ -122,7 +147,7 @@ public class CartService implements ICartService {
                     break;
                 }
             }
-            
+
             // If item doesn't exist in user cart, add it
             if (!itemFound) {
                 CartItemDto newItem = new CartItemDto();
@@ -131,7 +156,7 @@ public class CartService implements ICartService {
                 newItem.setProductName(guestItem.getProductName());
                 newItem.setPriceSnapshot(guestItem.getPriceSnapshot());
                 newItem.setImageUrl(guestItem.getImageUrl());
-                
+
                 userCart.getCartItems().add(newItem);
             }
         }

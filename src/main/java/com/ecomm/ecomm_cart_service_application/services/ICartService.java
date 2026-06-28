@@ -7,6 +7,8 @@ public interface ICartService {
 
     CartDto addToCart(String cartId, Long productId, String productName, String productImageUrl, Double priceSnapshot, CartType cartType, Integer quantity);
 
+    CartDto updateCartItemQuantity(String cartId, Long productId, Integer quantity);
+
     Boolean removeFromCart(String cartId, Long productId);
 
     Boolean clearCart(String cartId);

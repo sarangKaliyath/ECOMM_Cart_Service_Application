@@ -1,10 +1,8 @@
 package com.ecomm.ecomm_cart_service_application.controllers;
 
 import com.ecomm.ecomm_cart_service_application.constants.CartConstants;
-import com.ecomm.ecomm_cart_service_application.dtos.AddToCartRequestDto;
-import com.ecomm.ecomm_cart_service_application.dtos.CartDto;
-import com.ecomm.ecomm_cart_service_application.dtos.CartResponseDto;
-import com.ecomm.ecomm_cart_service_application.dtos.CartType;
+import com.ecomm.ecomm_cart_service_application.dtos.*;
+import com.ecomm.ecomm_cart_service_application.exceptions.CartIdRequiredException;
 import com.ecomm.ecomm_cart_service_application.mapper.CartMapper;
 import com.ecomm.ecomm_cart_service_application.services.ICartService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -41,6 +39,17 @@ public class CartController {
         CartDto cartDto = cartService.addToCart(guestCartId, reqDto.getProductId(), reqDto.getProductName(), reqDto.getImageUrl(), reqDto.getPriceSnapshot(), reqDto.getCartType(), reqDto.getQuantity());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(cartDto);
+    }
+
+    @PatchMapping("/quantity")
+    public ResponseEntity<CartResponseDto> updateCartItemQuantity(@RequestBody CartUpdateQuantityRequestDto reqDto, @CookieValue(value = "GUEST_CART_ID") String guestCartId) {
+        if (guestCartId == null) {
+            throw new CartIdRequiredException("GUEST_CART_ID is required.");
+        }
+
+        CartDto cartDto = cartService.updateCartItemQuantity(guestCartId, reqDto.getProductId(), reqDto.getQuantity());
+
+        return ResponseEntity.status(HttpStatus.OK).body(CartMapper.toCartResponseDto(cartDto));
     }
 
     public void removeItemFromCart() {
