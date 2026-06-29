@@ -59,19 +59,18 @@ public class CartController {
             @CookieValue(value = "GUEST_CART_ID", required = true) String cartId
     ) {
 
-        if(cartId == null) throw new CartIdRequiredException("GUEST_CART_ID is required");
+        if (cartId == null) throw new CartIdRequiredException("GUEST_CART_ID is required");
 
         return cartService.removeFromCart(cartType, cartId, productId) ? ResponseEntity.status(HttpStatus.OK).build() : ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
-    @DeleteMapping("/clear/cartType")
+    @DeleteMapping("/clear/{cartType}")
     public ResponseEntity<HttpStatus> clearCart(
+            @PathVariable CartType cartType,
             @CookieValue(value = "GUEST_CART_ID") String cartId
     ) {
-
-        if(cartId == null) throw new CartIdRequiredException("GUEST_CART_ID is required");
-
-        return cartService.clearCart(cartId) ? ResponseEntity.status(HttpStatus.OK).build() : ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        if (cartId == null) throw new CartIdRequiredException("GUEST_CART_ID is required");
+        return cartService.clearCart(cartType, cartId) ? ResponseEntity.status(HttpStatus.OK).build() : ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
     @GetMapping("/get/{cartType}")

@@ -12,7 +12,7 @@ public interface ICartService {
 
     Boolean removeFromCart(CartType cartType, String cartId, Long productId);
 
-    Boolean clearCart(String cartId);
+    Boolean clearCart(CartType cartType, String cartId);
 
     CartDto getCart(String cartId, CartType cartType);
 

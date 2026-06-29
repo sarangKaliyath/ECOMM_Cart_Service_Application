@@ -120,8 +120,9 @@ public class CartService implements ICartService {
         return true;
     }
 
-    public Boolean clearCart(String cartId) {
-        return false;
+    public Boolean clearCart(CartType cartType, String cartId) {
+        String redisKey = CartKeyUtil.cartKey(CartType.GUEST, cartId);
+        return cartRepository.delete(redisKey);
     }
 
     public CartDto getCart(String cartId, CartType cartType) {
