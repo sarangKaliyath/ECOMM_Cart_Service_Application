@@ -10,7 +10,7 @@ public interface ICartService {
 
     CartItemDto updateCartItemQuantity(String cartId, Long productId, Integer quantity);
 
-    Boolean removeFromCart(String cartId, Long productId);
+    Boolean removeFromCart(CartType cartType, String cartId, Long productId);
 
     Boolean clearCart(String cartId);
 

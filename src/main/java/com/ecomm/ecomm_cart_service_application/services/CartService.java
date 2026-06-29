@@ -95,8 +95,29 @@ public class CartService implements ICartService {
         return updatedItem;
     }
 
-    public Boolean removeFromCart(String cartId, Long productId) {
-        return false;
+    public Boolean removeFromCart(CartType cartType, String cartId, Long productId) {
+        if (productId == null) throw new IllegalArgumentException("Product ID cannot be null");
+
+        String redisKey = CartKeyUtil.cartKey(cartType, cartId);
+
+        CartDto cart = cartRepository.get(redisKey);
+        if (cart == null) throw new CartIdRequiredException("Cart not found");
+
+        boolean itemRemoved = cart.getCartItems().removeIf(item -> item.getProductId().equals(productId));
+
+        if (!itemRemoved) {
+            throw new IllegalArgumentException("Product with the specified ID not found in the cart");
+        }
+
+        // Recalculate the cart totals
+        CartUtils.recalculateCart(cart);
+        cart.setLastUpdatedAt(new Date());
+
+        // Save the updated cart back to the repository
+        cartRepository.save(redisKey, cart, 
+            cartType == CartType.GUEST ? CartConstants.GUEST_CART_TTL : CartConstants.USER_CART_TTL);
+
+        return true;
     }
 
     public Boolean clearCart(String cartId) {

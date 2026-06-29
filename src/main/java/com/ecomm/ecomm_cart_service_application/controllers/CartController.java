@@ -52,12 +52,26 @@ public class CartController {
         return ResponseEntity.status(HttpStatus.OK).body(CartMapper.toCartItemResponseDto(cartItem));
     }
 
-    public void removeItemFromCart() {
+    @DeleteMapping("/remove/{cartType}/{productId}")
+    public ResponseEntity<HttpStatus> removeItemFromCart(
+            @PathVariable CartType cartType,
+            @PathVariable Long productId,
+            @CookieValue(value = "GUEST_CART_ID", required = true) String cartId
+    ) {
 
+        if(cartId == null) throw new CartIdRequiredException("GUEST_CART_ID is required");
+
+        return cartService.removeFromCart(cartType, cartId, productId) ? ResponseEntity.status(HttpStatus.OK).build() : ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
-    public void clearCart() {
+    @DeleteMapping("/clear/cartType")
+    public ResponseEntity<HttpStatus> clearCart(
+            @CookieValue(value = "GUEST_CART_ID") String cartId
+    ) {
 
+        if(cartId == null) throw new CartIdRequiredException("GUEST_CART_ID is required");
+
+        return cartService.clearCart(cartId) ? ResponseEntity.status(HttpStatus.OK).build() : ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
     @GetMapping("/get/{cartType}")
