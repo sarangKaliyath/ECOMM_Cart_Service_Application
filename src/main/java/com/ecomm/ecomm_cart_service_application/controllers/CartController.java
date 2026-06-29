@@ -63,10 +63,17 @@ public class CartController {
     @GetMapping("/get/{cartType}")
     public ResponseEntity<CartResponseDto> getCartItems(
             @PathVariable CartType cartType,
-            @CookieValue(value = "GUEST_CART_ID", required = false) String cartId) {
+            @CookieValue(value = "GUEST_CART_ID", required = false) String cartId,
+            HttpServletResponse response) {
 
         if (cartId == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            cartId = UUID.randomUUID().toString();
+            ResponseCookie cookie = ResponseCookie.from("GUEST_CART_ID", cartId)
+                    .httpOnly(true)
+                    .path("/")
+                    .maxAge(CartConstants.GUEST_CART_TTL)
+                    .build();
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         }
 
         CartDto cart = cartService.getCart(cartId, cartType);
