@@ -1,9 +1,6 @@
 package com.ecomm.ecomm_cart_service_application.mapper;
 
-import com.ecomm.ecomm_cart_service_application.dtos.CartDto;
-import com.ecomm.ecomm_cart_service_application.dtos.CartItemDto;
-import com.ecomm.ecomm_cart_service_application.dtos.CartResponseDto;
-import com.ecomm.ecomm_cart_service_application.dtos.CartType;
+import com.ecomm.ecomm_cart_service_application.dtos.*;
 
 public class CartMapper {
 
@@ -25,6 +22,22 @@ public class CartMapper {
 
         return response;
     }
+
+    public static CartItemResponseDto toCartItemResponseDto(CartItemDto cartItemDto) {
+        if (cartItemDto == null) {
+            return null;
+        }
+
+        CartItemResponseDto response = new CartItemResponseDto();
+        response.setProductId(cartItemDto.getProductId());
+        response.setProductName(cartItemDto.getProductName());
+        response.setImageUrl(cartItemDto.getImageUrl());
+        response.setQuantity(cartItemDto.getQuantity());
+        response.setPriceSnapshot(cartItemDto.getPriceSnapshot());
+
+        return response;
+    }
+
 
     public CartDto toResponse(Object cart, CartType cartType) {
         return null;

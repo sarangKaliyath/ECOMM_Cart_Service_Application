@@ -63,28 +63,36 @@ public class CartService implements ICartService {
         return cart;
     }
 
-    public CartDto updateCartItemQuantity(String cartId, Long productId, Integer quantity) {
-        if(productId == null) throw new IllegalArgumentException("Product ID cannot be null");
-        if(quantity == null || quantity <= 0) throw new InvalidQuantityException("Invalid quantity");
+    public CartItemDto updateCartItemQuantity(String cartId, Long productId, Integer quantity) {
+        if (productId == null) throw new IllegalArgumentException("Product ID cannot be null");
+        if (quantity == null || quantity <= 0) throw new InvalidQuantityException("Invalid quantity");
 
         String redisKey = CartKeyUtil.cartKey(CartType.GUEST, cartId);
 
         CartDto cart = cartRepository.get(redisKey);
 
-        if(cart == null) throw new CartIdRequiredException("Cart not found");
+        if (cart == null) throw new CartIdRequiredException("Cart not found");
 
-        for(CartItemDto item : cart.getCartItems()) {
-            if(item.getProductId().equals(productId)) {
+        CartItemDto updatedItem = null;
+        
+        for (CartItemDto item : cart.getCartItems()) {
+            if (item.getProductId().equals(productId)) {
                 item.setQuantity(quantity);
+                updatedItem = item;
+                
+                // Recalculate cart and update metadata
                 CartUtils.recalculateCart(cart);
                 cart.setLastUpdatedAt(new Date());
                 cartRepository.save(redisKey, cart, CartConstants.GUEST_CART_TTL);
+                break;
             }
         }
 
-        cartRepository.save(redisKey, cart, CartConstants.GUEST_CART_TTL);
+        if (updatedItem == null) {
+            throw new IllegalArgumentException("Product with the specified ID not found in the cart");
+        }
 
-        return cart;
+        return updatedItem;
     }
 
     public Boolean removeFromCart(String cartId, Long productId) {

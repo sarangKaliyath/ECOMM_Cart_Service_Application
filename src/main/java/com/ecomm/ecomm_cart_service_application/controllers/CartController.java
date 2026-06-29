@@ -42,14 +42,14 @@ public class CartController {
     }
 
     @PatchMapping("/quantity")
-    public ResponseEntity<CartResponseDto> updateCartItemQuantity(@RequestBody CartUpdateQuantityRequestDto reqDto, @CookieValue(value = "GUEST_CART_ID") String guestCartId) {
+    public ResponseEntity<CartItemResponseDto> updateCartItemQuantity(@RequestBody CartUpdateQuantityRequestDto reqDto, @CookieValue(value = "GUEST_CART_ID") String guestCartId) {
         if (guestCartId == null) {
             throw new CartIdRequiredException("GUEST_CART_ID is required.");
         }
 
-        CartDto cartDto = cartService.updateCartItemQuantity(guestCartId, reqDto.getProductId(), reqDto.getQuantity());
+        CartItemDto cartItem = cartService.updateCartItemQuantity(guestCartId, reqDto.getProductId(), reqDto.getQuantity());
 
-        return ResponseEntity.status(HttpStatus.OK).body(CartMapper.toCartResponseDto(cartDto));
+        return ResponseEntity.status(HttpStatus.OK).body(CartMapper.toCartItemResponseDto(cartItem));
     }
 
     public void removeItemFromCart() {
