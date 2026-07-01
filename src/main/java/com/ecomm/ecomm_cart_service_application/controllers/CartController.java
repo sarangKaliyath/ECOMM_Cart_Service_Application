@@ -25,62 +25,20 @@ public class CartController {
 
 
     @PostMapping("/add")
-    public ResponseEntity<CartDto> addItemToCart(@RequestBody AddToCartRequestDto reqDto, @CookieValue(value = "GUEST_CART_ID", required = false)
-    String guestCartId, HttpServletResponse response) {
-        if (guestCartId == null) guestCartId = UUID.randomUUID().toString();
-
-        ResponseCookie cookie = ResponseCookie.from("GUEST_CART_ID", guestCartId)
-                .httpOnly(true)
-                .path("/")
-                .maxAge(CartConstants.GUEST_CART_TTL)
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-
-        CartDto cartDto = cartService.addToCart(guestCartId, reqDto.getProductId(), reqDto.getProductName(), reqDto.getImageUrl(), reqDto.getPriceSnapshot(), reqDto.getCartType(), reqDto.getQuantity());
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(cartDto);
-    }
-
-    @PatchMapping("/quantity")
-    public ResponseEntity<CartItemResponseDto> updateCartItemQuantity(@RequestBody CartUpdateQuantityRequestDto reqDto, @CookieValue(value = "GUEST_CART_ID") String guestCartId) {
-        if (guestCartId == null) {
-            throw new CartIdRequiredException("GUEST_CART_ID is required.");
-        }
-
-        CartItemDto cartItem = cartService.updateCartItemQuantity(guestCartId, reqDto.getProductId(), reqDto.getQuantity());
-
-        return ResponseEntity.status(HttpStatus.OK).body(CartMapper.toCartItemResponseDto(cartItem));
-    }
-
-    @DeleteMapping("/remove/{cartType}/{productId}")
-    public ResponseEntity<HttpStatus> removeItemFromCart(
-            @PathVariable CartType cartType,
-            @PathVariable Long productId,
-            @CookieValue(value = "GUEST_CART_ID", required = true) String cartId
-    ) {
-
-        if (cartId == null) throw new CartIdRequiredException("GUEST_CART_ID is required");
-
-        return cartService.removeFromCart(cartType, cartId, productId) ? ResponseEntity.status(HttpStatus.OK).build() : ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    @DeleteMapping("/clear/{cartType}")
-    public ResponseEntity<HttpStatus> clearCart(
-            @PathVariable CartType cartType,
-            @CookieValue(value = "GUEST_CART_ID") String cartId
-    ) {
-        if (cartId == null) throw new CartIdRequiredException("GUEST_CART_ID is required");
-        return cartService.clearCart(cartType, cartId) ? ResponseEntity.status(HttpStatus.OK).build() : ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    @GetMapping("/get/{cartType}")
-    public ResponseEntity<CartResponseDto> getCartItems(
-            @PathVariable CartType cartType,
-            @CookieValue(value = "GUEST_CART_ID", required = false) String cartId,
+    public ResponseEntity<CartDto> addItemToCart(
+            @RequestBody AddToCartRequestDto reqDto,
+            @CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId,
+            JwtAuthenticationToken token,
             HttpServletResponse response) {
 
-        if (cartId == null) {
-            cartId = UUID.randomUUID().toString();
+        String cartId;
+        CartType cartType = resolveCartType(token);
+
+        if (token != null) {
+            cartId = token.getName();
+        } else {
+            if (guestCartId == null) guestCartId = UUID.randomUUID().toString();
+            cartId = guestCartId;
             ResponseCookie cookie = ResponseCookie.from("GUEST_CART_ID", cartId)
                     .httpOnly(true)
                     .path("/")
@@ -89,23 +47,108 @@ public class CartController {
             response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         }
 
-        CartDto cart = cartService.getCart(cartId, cartType);
+        CartDto cartDto = cartService.addToCart(cartId, reqDto.getProductId(), reqDto.getProductName(),
+                reqDto.getImageUrl(), reqDto.getPriceSnapshot(), cartType, reqDto.getQuantity());
 
-        CartResponseDto cartResponse = CartMapper.toCartResponseDto(cart);
-        return ResponseEntity.status(HttpStatus.OK).body(cartResponse);
+        return ResponseEntity.status(HttpStatus.CREATED).body(cartDto);
+    }
+
+    @PatchMapping("/quantity")
+    public ResponseEntity<CartItemResponseDto> updateCartItemQuantity(
+            @RequestBody CartUpdateQuantityRequestDto reqDto,
+            @CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId,
+            JwtAuthenticationToken token) {
+
+        String cartId = resolveCartId(token, guestCartId);
+        CartType cartType = resolveCartType(token);
+
+        CartItemDto cartItem = cartService.updateCartItemQuantity(cartId, reqDto.getProductId(), cartType, reqDto.getQuantity());
+        return ResponseEntity.status(HttpStatus.OK).body(CartMapper.toCartItemResponseDto(cartItem));
+    }
+
+    @DeleteMapping("/remove/{productId}")
+    public ResponseEntity<HttpStatus> removeItemFromCart(
+            @PathVariable Long productId,
+            @CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId,
+            JwtAuthenticationToken token) {
+
+        String cartId = resolveCartId(token, guestCartId);
+        CartType cartType = resolveCartType(token);
+
+        return cartService.removeFromCart(cartType, cartId, productId)
+                ? ResponseEntity.status(HttpStatus.OK).build()
+                : ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+
+    @DeleteMapping("/clear")
+    public ResponseEntity<HttpStatus> clearCart(
+            @CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId,
+            JwtAuthenticationToken token) {
+
+        String cartId = resolveCartId(token, guestCartId);
+        CartType cartType = resolveCartType(token);
+
+        return cartService.clearCart(cartType, cartId)
+                ? ResponseEntity.status(HttpStatus.OK).build()
+                : ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+
+    @GetMapping("/get")
+    public ResponseEntity<CartResponseDto> getCartItems(
+            @CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId,
+            JwtAuthenticationToken token,
+            HttpServletResponse response) {
+
+        String cartId;
+        CartType cartType = resolveCartType(token);
+
+        if (token != null) {
+            cartId = token.getName();
+        } else {
+            if (guestCartId == null) {
+                guestCartId = UUID.randomUUID().toString();
+                ResponseCookie cookie = ResponseCookie.from("GUEST_CART_ID", guestCartId)
+                        .httpOnly(true)
+                        .path("/")
+                        .maxAge(CartConstants.GUEST_CART_TTL)
+                        .build();
+                response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+            }
+            cartId = guestCartId;
+        }
+
+        CartDto cart = cartService.getCart(cartId, cartType);
+        return ResponseEntity.status(HttpStatus.OK).body(CartMapper.toCartResponseDto(cart));
     }
 
     @PostMapping("/merge")
-    public ResponseEntity<CartDto> mergeCarts(@CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId, JwtAuthenticationToken token) {
-        System.out.println(token);
+    public ResponseEntity<CartDto> mergeCarts(
+            @CookieValue(value = "GUEST_CART_ID", required = false) String guestCartId,
+            JwtAuthenticationToken token,
+            HttpServletResponse response) {
+
         String userId = token.getName();
 
-        System.out.println(userId);
+        CartDto mergedCart = cartService.mergeCart(guestCartId, userId);
 
-        if (guestCartId == null) {
-            return ResponseEntity.status(HttpStatus.OK).body(cartService.getCart(userId, CartType.USER));
-        }
+        ResponseCookie clearCookie = ResponseCookie.from("GUEST_CART_ID", "")
+                .httpOnly(true)
+                .path("/")
+                .maxAge(0)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, clearCookie.toString());
 
-        return ResponseEntity.status(HttpStatus.OK).body(cartService.mergeCart(guestCartId, userId));
+        return ResponseEntity.status(HttpStatus.OK).body(mergedCart);
+    }
+
+    private CartType resolveCartType(JwtAuthenticationToken token) {
+        return token != null ? CartType.USER : CartType.GUEST;
+    }
+
+    private String resolveCartId(JwtAuthenticationToken token, String guestCartId) {
+        if (token != null) return token.getName();
+        if (guestCartId == null || guestCartId.isBlank())
+            throw new CartIdRequiredException("GUEST_CART_ID is required");
+        return guestCartId;
     }
 }

@@ -7,7 +7,6 @@ import lombok.Setter;
 @Setter
 public class AddToCartRequestDto {
     private Long productId;
-    private CartType cartType;
     private Integer quantity;
     private String imageUrl;
     private String productName;

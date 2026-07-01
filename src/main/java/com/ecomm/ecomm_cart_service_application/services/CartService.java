@@ -63,11 +63,11 @@ public class CartService implements ICartService {
         return cart;
     }
 
-    public CartItemDto updateCartItemQuantity(String cartId, Long productId, Integer quantity) {
+    public CartItemDto updateCartItemQuantity(String cartId, Long productId, CartType cartType, Integer quantity) {
         if (productId == null) throw new IllegalArgumentException("Product ID cannot be null");
         if (quantity == null || quantity <= 0) throw new InvalidQuantityException("Invalid quantity");
 
-        String redisKey = CartKeyUtil.cartKey(CartType.GUEST, cartId);
+        String redisKey = CartKeyUtil.cartKey(cartType, cartId);
 
         CartDto cart = cartRepository.get(redisKey);
 
@@ -83,7 +83,7 @@ public class CartService implements ICartService {
                 // Recalculate cart and update metadata
                 CartUtils.recalculateCart(cart);
                 cart.setLastUpdatedAt(new Date());
-                cartRepository.save(redisKey, cart, CartConstants.GUEST_CART_TTL);
+                cartRepository.save(redisKey, cart, cartType == CartType.GUEST ? CartConstants.GUEST_CART_TTL : CartConstants.USER_CART_TTL);
                 break;
             }
         }
@@ -121,7 +121,7 @@ public class CartService implements ICartService {
     }
 
     public Boolean clearCart(CartType cartType, String cartId) {
-        String redisKey = CartKeyUtil.cartKey(CartType.GUEST, cartId);
+        String redisKey = CartKeyUtil.cartKey(cartType, cartId);
         return cartRepository.delete(redisKey);
     }
 
@@ -134,11 +134,20 @@ public class CartService implements ICartService {
     }
 
     public CartDto mergeCart(String guestCartId, String userCartId) {
-        if (guestCartId == null || guestCartId.isBlank()) {
-            throw new IllegalArgumentException("Guest cart ID cannot be blank");
-        }
         if (userCartId == null || userCartId.isBlank()) {
             throw new IllegalArgumentException("User cart ID cannot be blank");
+        }
+
+        String userRedisKey = CartKeyUtil.cartKey(CartType.USER, userCartId);
+
+        // No guest cart cookie — return or create the user cart
+        if (guestCartId == null || guestCartId.isBlank()) {
+            CartDto userCart = cartRepository.get(userRedisKey);
+            if (userCart == null) {
+                userCart = CartUtils.createNewCart(userCartId, CartType.USER);
+                cartRepository.save(userRedisKey, userCart, CartConstants.USER_CART_TTL);
+            }
+            return userCart;
         }
 
         // Get the guest cart
@@ -147,17 +156,15 @@ public class CartService implements ICartService {
 
         // If guest cart doesn't exist or is empty, get or create user cart
         if (guestCart == null || guestCart.getCartItems().isEmpty()) {
-            CartDto userCart = getCart(userCartId, CartType.USER);
+            CartDto userCart = cartRepository.get(userRedisKey);
             if (userCart == null) {
                 userCart = CartUtils.createNewCart(userCartId, CartType.USER);
-                String userRedisKey = CartKeyUtil.cartKey(CartType.USER, userCartId);
                 cartRepository.save(userRedisKey, userCart, CartConstants.USER_CART_TTL);
             }
             return userCart;
         }
 
         // Get or create user cart
-        String userRedisKey = CartKeyUtil.cartKey(CartType.USER, userCartId);
         CartDto userCart = cartRepository.get(userRedisKey);
 
         if (userCart == null) {
