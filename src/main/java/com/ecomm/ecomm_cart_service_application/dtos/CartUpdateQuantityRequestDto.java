@@ -5,10 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class AddToCartRequestDto {
+public class CartUpdateQuantityRequestDto {
     private Long productId;
     private Integer quantity;
-    private String imageUrl;
-    private String productName;
-    private Double priceSnapshot;
 }

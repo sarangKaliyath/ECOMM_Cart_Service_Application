@@ -23,8 +23,8 @@ public class CartRepository {
         redisTemplate.opsForValue().set(key, cartDto, ttl);
     }
 
-    public void delete(String key) {
-        redisTemplate.delete(key);
+    public Boolean delete(String key) {
+        return redisTemplate.delete(key);
     }
 
 }

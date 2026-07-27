@@ -5,6 +5,7 @@ import com.ecomm.ecomm_cart_service_application.constants.CartConstants;
 import com.ecomm.ecomm_cart_service_application.dtos.CartDto;
 import com.ecomm.ecomm_cart_service_application.dtos.CartItemDto;
 import com.ecomm.ecomm_cart_service_application.dtos.CartType;
+import com.ecomm.ecomm_cart_service_application.exceptions.CartIdRequiredException;
 import com.ecomm.ecomm_cart_service_application.exceptions.InvalidQuantityException;
 import com.ecomm.ecomm_cart_service_application.utils.CartKeyUtil;
 import com.ecomm.ecomm_cart_service_application.utils.CartUtils;
@@ -62,12 +63,66 @@ public class CartService implements ICartService {
         return cart;
     }
 
-    public Boolean removeFromCart(String cartId, Long productId) {
-        return false;
+    public CartItemDto updateCartItemQuantity(String cartId, Long productId, CartType cartType, Integer quantity) {
+        if (productId == null) throw new IllegalArgumentException("Product ID cannot be null");
+        if (quantity == null || quantity <= 0) throw new InvalidQuantityException("Invalid quantity");
+
+        String redisKey = CartKeyUtil.cartKey(cartType, cartId);
+
+        CartDto cart = cartRepository.get(redisKey);
+
+        if (cart == null) throw new CartIdRequiredException("Cart not found");
+
+        CartItemDto updatedItem = null;
+        
+        for (CartItemDto item : cart.getCartItems()) {
+            if (item.getProductId().equals(productId)) {
+                item.setQuantity(quantity);
+                updatedItem = item;
+                
+                // Recalculate cart and update metadata
+                CartUtils.recalculateCart(cart);
+                cart.setLastUpdatedAt(new Date());
+                cartRepository.save(redisKey, cart, cartType == CartType.GUEST ? CartConstants.GUEST_CART_TTL : CartConstants.USER_CART_TTL);
+                break;
+            }
+        }
+
+        if (updatedItem == null) {
+            throw new IllegalArgumentException("Product with the specified ID not found in the cart");
+        }
+
+        return updatedItem;
     }
 
-    public Boolean clearCart(String cartId) {
-        return false;
+    public Boolean removeFromCart(CartType cartType, String cartId, Long productId) {
+        if (productId == null) throw new IllegalArgumentException("Product ID cannot be null");
+
+        String redisKey = CartKeyUtil.cartKey(cartType, cartId);
+
+        CartDto cart = cartRepository.get(redisKey);
+        if (cart == null) throw new CartIdRequiredException("Cart not found");
+
+        boolean itemRemoved = cart.getCartItems().removeIf(item -> item.getProductId().equals(productId));
+
+        if (!itemRemoved) {
+            throw new IllegalArgumentException("Product with the specified ID not found in the cart");
+        }
+
+        // Recalculate the cart totals
+        CartUtils.recalculateCart(cart);
+        cart.setLastUpdatedAt(new Date());
+
+        // Save the updated cart back to the repository
+        cartRepository.save(redisKey, cart, 
+            cartType == CartType.GUEST ? CartConstants.GUEST_CART_TTL : CartConstants.USER_CART_TTL);
+
+        return true;
+    }
+
+    public Boolean clearCart(CartType cartType, String cartId) {
+        String redisKey = CartKeyUtil.cartKey(cartType, cartId);
+        return cartRepository.delete(redisKey);
     }
 
     public CartDto getCart(String cartId, CartType cartType) {
@@ -76,5 +131,83 @@ public class CartService implements ICartService {
         String redisKey = CartKeyUtil.cartKey(cartType, cartId);
 
         return cartRepository.get(redisKey);
+    }
+
+    public CartDto mergeCart(String guestCartId, String userCartId) {
+        if (userCartId == null || userCartId.isBlank()) {
+            throw new IllegalArgumentException("User cart ID cannot be blank");
+        }
+
+        String userRedisKey = CartKeyUtil.cartKey(CartType.USER, userCartId);
+
+        // No guest cart cookie — return or create the user cart
+        if (guestCartId == null || guestCartId.isBlank()) {
+            CartDto userCart = cartRepository.get(userRedisKey);
+            if (userCart == null) {
+                userCart = CartUtils.createNewCart(userCartId, CartType.USER);
+                cartRepository.save(userRedisKey, userCart, CartConstants.USER_CART_TTL);
+            }
+            return userCart;
+        }
+
+        // Get the guest cart
+        String guestRedisKey = CartKeyUtil.cartKey(CartType.GUEST, guestCartId);
+        CartDto guestCart = cartRepository.get(guestRedisKey);
+
+        // If guest cart doesn't exist or is empty, get or create user cart
+        if (guestCart == null || guestCart.getCartItems().isEmpty()) {
+            CartDto userCart = cartRepository.get(userRedisKey);
+            if (userCart == null) {
+                userCart = CartUtils.createNewCart(userCartId, CartType.USER);
+                cartRepository.save(userRedisKey, userCart, CartConstants.USER_CART_TTL);
+            }
+            return userCart;
+        }
+
+        // Get or create user cart
+        CartDto userCart = cartRepository.get(userRedisKey);
+
+        if (userCart == null) {
+            userCart = CartUtils.createNewCart(userCartId, CartType.USER);
+        }
+
+        // Merge guest cart items into user cart
+        for (CartItemDto guestItem : guestCart.getCartItems()) {
+            boolean itemFound = false;
+
+            // Check if item already exists in user cart
+            for (CartItemDto userItem : userCart.getCartItems()) {
+                if (userItem.getProductId().equals(guestItem.getProductId())) {
+                    // Combine quantities
+                    userItem.setQuantity(userItem.getQuantity() + guestItem.getQuantity());
+                    itemFound = true;
+                    break;
+                }
+            }
+
+            // If item doesn't exist in user cart, add it
+            if (!itemFound) {
+                CartItemDto newItem = new CartItemDto();
+                newItem.setProductId(guestItem.getProductId());
+                newItem.setQuantity(guestItem.getQuantity());
+                newItem.setProductName(guestItem.getProductName());
+                newItem.setPriceSnapshot(guestItem.getPriceSnapshot());
+                newItem.setImageUrl(guestItem.getImageUrl());
+
+                userCart.getCartItems().add(newItem);
+            }
+        }
+
+        // Recalculate totals and update timestamp
+        CartUtils.recalculateCart(userCart);
+        userCart.setLastUpdatedAt(new Date());
+
+        // Save the merged user cart
+        cartRepository.save(userRedisKey, userCart, CartConstants.USER_CART_TTL);
+
+        // Clean up guest cart
+        cartRepository.delete(guestRedisKey);
+
+        return userCart;
     }
 }

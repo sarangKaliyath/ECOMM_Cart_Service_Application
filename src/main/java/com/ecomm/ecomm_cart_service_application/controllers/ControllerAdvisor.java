@@ -1,5 +1,6 @@
 package com.ecomm.ecomm_cart_service_application.controllers;
 
+import com.ecomm.ecomm_cart_service_application.exceptions.CartIdRequiredException;
 import com.ecomm.ecomm_cart_service_application.exceptions.InvalidQuantityException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +17,11 @@ public class ControllerAdvisor {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(ex.getMessage());
+    }
+
+    @ExceptionHandler(CartIdRequiredException.class)
+    public ResponseEntity<String> handleCardIdRequiredException(Exception ex) {
         return ResponseEntity.badRequest().body(ex.getMessage());
     }
 }
