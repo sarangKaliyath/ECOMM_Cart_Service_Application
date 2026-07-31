@@ -21,7 +21,6 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        System.out.println("JWT Secret: " + jwtSecret);
         http
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
